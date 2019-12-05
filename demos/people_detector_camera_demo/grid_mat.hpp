@@ -27,22 +27,22 @@ public:
         }
 
         size_t nGridRows = static_cast<size_t>(ceil(sqrt(static_cast<float>(sizes.size()))));
-        size_t nGridCols = (sizes.size() - 1) / nGridRows + 1;
+	size_t nGridCols = (sizes.size() - 1) / nGridRows + 1;
         size_t gridMaxWidth = static_cast<size_t>(maxDisp.width/nGridCols);
-        size_t gridMaxHeight = static_cast<size_t>(maxDisp.height/nGridRows);
-
+	size_t gridMaxHeight = static_cast<size_t>(maxDisp.height/nGridRows);
+	
         float scaleWidth = static_cast<float>(gridMaxWidth) / maxWidth;
-        float scaleHeight = static_cast<float>(gridMaxHeight) / maxHeight;
-        float scaleFactor = std::min(1.f, std::min(scaleWidth, scaleHeight));
-
-        cellSize.width = static_cast<int>(maxWidth * scaleFactor);
-        cellSize.height = static_cast<int>(maxHeight * scaleFactor);
-
+	float scaleHeight = static_cast<float>(gridMaxHeight) / maxHeight;
+	// float scaleFactor = std::min(1.f, std::min(scaleWidth, scaleHeight));
+	
+        cellSize.width = static_cast<int>(maxWidth * scaleWidth);
+	cellSize.height = static_cast<int>(maxHeight * scaleHeight);
+	
         for (size_t i = 0; i < sizes.size(); i++) {
             cv::Point p;
-            p.x = cellSize.width * (i % nGridCols);
+	    p.x = cellSize.width * (i % nGridCols);
             p.y = cellSize.height * (i / nGridCols);
-            points.push_back(p);
+	    points.push_back(p);
         }
 
         outimg.create(cellSize.height * nGridRows, cellSize.width * nGridCols, CV_8UC3);

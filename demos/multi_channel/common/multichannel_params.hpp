@@ -30,6 +30,10 @@ static const char duplication_channel_number[] = "Optional. Enable and specify t
 static const char real_input_fps[] = "Optional. Disable input frames caching, for maximum throughput pipeline";
 static const char input_video[] = "Optional. Specify full path to input video files";
 
+/// @brief Message for display resolution argument
+static const char display_resolution_message[] = "Optional. Specify the maximum output window resolution.";
+
+/// \brief Define a flag for showing help message <br>
 DEFINE_bool(h, false, help_message);
 DEFINE_string(m, "", model_path_message);
 DEFINE_string(d, "CPU", target_device_message);
@@ -47,3 +51,7 @@ DEFINE_bool(show_stats, false, show_statistics);
 DEFINE_uint32(duplicate_num, 0, duplication_channel_number);
 DEFINE_bool(real_input_fps, false, real_input_fps);
 DEFINE_string(i, "", input_video);
+
+/// \brief Flag to specify the maximum output window resolution<br>
+/// It is an optional parameter
+DEFINE_string(display_resolution, "1920x1080", display_resolution_message);

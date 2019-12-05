@@ -82,7 +82,17 @@ void showUsage() {
     std::cout << "    -duplicate_num               " << duplication_channel_number << std::endl;
     std::cout << "    -real_input_fps              " << real_input_fps << std::endl;
     std::cout << "    -i                           " << input_video << std::endl;
+    std::cout << "    -display_resolution          " << display_resolution_message << std::endl;
 }
+
+void fillROIColor(cv::Mat& displayImage, cv::Rect roi, cv::Scalar color, float opacity) {
+    if (opacity > 0) {
+        roi = roi & cv::Rect(0, 0, displayImage.cols, displayImage.rows);
+        cv::Mat textROI = displayImage(roi);
+        cv::addWeighted(color, opacity, textROI, 1.0 - opacity , 0.0, textROI);
+    }
+}
+
 
 bool ParseAndCheckCommandLine(int argc, char *argv[]) {
     // ---------------------------Parsing and validation of input args--------------------------------------
@@ -111,12 +121,13 @@ bool ParseAndCheckCommandLine(int argc, char *argv[]) {
     slog::info << "\tBatch size:                " << FLAGS_bs << slog::endl;
     slog::info << "\tNumber of infer requests:  " << FLAGS_nireq << slog::endl;
     slog::info << "\tNumber of input web cams:  "  << FLAGS_nc << slog::endl;
+    if (FLAGS_display_resolution.find("x") == std::string::npos) {
+        throw std::logic_error("Incorrect format of -displayresolution parameter. Correct format is  \"width\"x\"height\". For example \"1920x1080\"");
+    }
 
     return true;
 }
 
-const size_t DISP_WIDTH  = 1920;
-const size_t DISP_HEIGHT = 1080;
 const size_t MAX_INPUTS  = 25;
 
 struct DisplayParams {
@@ -127,20 +138,21 @@ struct DisplayParams {
     cv::Point points[MAX_INPUTS];
 };
 
-DisplayParams prepareDisplayParams(size_t count) {
+DisplayParams prepareDisplayParams(const size_t count, const cv::Size displaySize = cv::Size{1920, 1080}) {
     DisplayParams params;
-    params.count = count;
-    params.windowSize = cv::Size(DISP_WIDTH, DISP_HEIGHT);
+    params.count      = count;
+    params.windowSize = cv::Size(displaySize.width, displaySize.height);
 
-    size_t gridCount = static_cast<size_t>(ceil(sqrt(count)));
-    size_t gridStepX = static_cast<size_t>(DISP_WIDTH/gridCount);
-    size_t gridStepY = static_cast<size_t>(DISP_HEIGHT/gridCount);
+    size_t gridRows  = static_cast<size_t>(ceil(sqrt(count)));
+    size_t gridCols  = (count - 1) / gridRows + 1;
+    size_t gridStepX = static_cast<size_t>(displaySize.width/gridCols);
+    size_t gridStepY = static_cast<size_t>(displaySize.height/gridRows);
     params.frameSize = cv::Size(gridStepX, gridStepY);
 
     for (size_t i = 0; i < count; i++) {
         cv::Point p;
-        p.x = gridStepX * (i/gridCount);
-        p.y = gridStepY * (i%gridCount);
+        p.x = gridStepX * (i/gridRows);
+        p.y = gridStepY * (i%gridRows);
         params.points[i] = p;
     }
     return params;
@@ -161,9 +173,9 @@ void displayNSources(const std::vector<std::shared_ptr<VideoFrame>>& data,
         }
     };
 
-    auto drawStats = [&]() {
+    auto drawStats = [&](const cv::Size winSize) {
         if (FLAGS_show_stats && !stats.empty()) {
-            static const cv::Point posPoint = cv::Point(3*DISP_WIDTH/4, 4*DISP_HEIGHT/5);
+            static const cv::Point posPoint = cv::Point(3*winSize.width/4, 4*winSize.height/5);
             auto pos = posPoint + cv::Point(0, 25);
             size_t currPos = 0;
             while (true) {
@@ -190,12 +202,15 @@ void displayNSources(const std::vector<std::shared_ptr<VideoFrame>>& data,
         loopBody(i);
     }
 #endif
-    drawStats();
+    drawStats(params.windowSize);
 
     char str[256];
     snprintf(str, sizeof(str), "%5.2f fps", static_cast<double>(1000.0f/time));
-    cv::putText(windowImage, str, cv::Point(800, 100), cv::HersheyFonts::FONT_HERSHEY_COMPLEX, 2.0,  cv::Scalar(0, 255, 0), 2);
-    cv::imshow(params.name, windowImage);
+    constexpr float OPACITY = 0.6f;
+    fillROIColor(windowImage, cv::Rect(5, 5, 150, 50), cv::Scalar(255, 0, 0), OPACITY);
+    cv::putText(windowImage, str, cv::Point(15, 35), cv::HersheyFonts::FONT_HERSHEY_COMPLEX, 0.8,  cv::Scalar(255, 255, 255));
+    cv::moveWindow("Detection results", 480*2, 329);
+    cv::imshow("Detection results", windowImage);
 }
 
 }  // namespace
@@ -251,7 +266,13 @@ int main(int argc, char* argv[]) {
         const auto duplicateFactor = (1 + FLAGS_duplicate_num);
         size_t numberOfInputs = (FLAGS_nc + files.size()) * duplicateFactor;
 
-        DisplayParams params = prepareDisplayParams(numberOfInputs);
+        slog::info << "Display resolution: " << FLAGS_display_resolution << slog::endl;
+        found = FLAGS_display_resolution.find("x");
+        cv::Size displayResolution = cv::Size{std::stoi(FLAGS_display_resolution.substr(0, found)),
+                                              std::stoi(FLAGS_display_resolution.substr(found + 1, FLAGS_display_resolution.length()))};
+
+        DisplayParams params = prepareDisplayParams(numberOfInputs, displayResolution);
+
 
         slog::info << "\tNumber of input channels:    " << numberOfInputs << slog::endl;
         if (numberOfInputs > MAX_INPUTS) {
